@@ -8,10 +8,6 @@ var util = require('util')
 
 var Maga = {}
 
-/*
- * Protocol
- * Usage: new Maga.Protocol(game instance, channel instance)
- */
 Maga.Protocol = function(game, channel) {
   this.game = game
   this.channel = channel || game.createChannel()
@@ -20,10 +16,9 @@ Maga.Protocol = function(game, channel) {
   return this
 }
 
-// Serialize state of object id
 Maga.Protocol.prototype.stringify = function(id) {
   var obj = {}, state = {}
-  state[id] = this.channel.state.current[id]
+  state[id] = this.channel.state.current && this.channel.state.current[id]
   var diff = this.channel.state.compare.call(this.channel.state, state, this.statePrevious, ['input'])
   this.statePrevious = state
   obj[this.channel.state.frame || 0] = state || {}
@@ -35,7 +30,6 @@ Maga.Protocol.prototype.stringify = function(id) {
   return str
 }
  
-// Apply given state to game 
 Maga.Protocol.prototype.parse = function(stringified) {
   var state = JSON.parse(stringified)
   //console.log('RECEIVED STRINGIFIED:', state)
@@ -44,9 +38,9 @@ Maga.Protocol.prototype.parse = function(stringified) {
 
 Maga.Protocol.prototype.applyState = function(myId, state) {
   for (var frame in state) {
-    if (!frame) frame = 0
-    this.channel.state.set.call(this.channel.state, state[frame])
-    this.channel.state.replay.call(this.channel.state, myId, frame, state[frame])
+    if (!frame || isNaN(frame)) frame = 0
+    var newState = this.channel.state.replay.call(this.channel.state, myId, frame, state[frame])
+    this.channel.state.set(newState)
   }
 }
 
@@ -57,8 +51,8 @@ Maga.Game = function(options) {
   this.name = 'Maga Game'
   this.frameTime    = 1000 / 45
   this.loopTime     = 1000 / 135
-  this.maxFrameTime = 1000 / 46
-  this.syncTime     = 1000 / 15
+  this.maxFrameTime = 1000 / 45
+  this.syncTime     = 1000 / 5
   for (var k in options) {
     this[k] = options[k]
   }
@@ -229,8 +223,8 @@ Maga.State = function(channel) {
   this.channel = channel
 
   // Current and previous state objects
-  this.current = {}
-  this.previous = {}
+	this.current = {}
+	this.previous = {}
 
   // Frame position
   this.frame = 0
@@ -373,7 +367,12 @@ Maga.State.prototype.replay = function(myId, frame, state) {
   if (!this.frame || isNaN(frame) || frame == 0) return
 
   this.set(state)
-
+  
+  if (frame > this.frame) { 
+    this.frame = frame
+    return state
+  }
+    
   for (var id in state) {
     if (this.channel.objects.hasOwnProperty(id)) {
       this.channel.objects[id].applyState(state[id])  
@@ -382,8 +381,7 @@ Maga.State.prototype.replay = function(myId, frame, state) {
   
   var newState = {}
 
-  if (frame > this.frame) this.frame = frame - 1
-  else for (var f = 0; f < (this.frame - frame); f++) {
+  for (var f = frame; f < this.frame; f++) {
     if (!this.history[f]) this.history[f] = {}
   
     for (var id in state) {
@@ -391,12 +389,11 @@ Maga.State.prototype.replay = function(myId, frame, state) {
         history[f] && this.channel.objects[id].applyState(history[f][id], ['input'])
         this.channel.objects[id].update()
         newState[id] = this.channel.objects[id].state()
-        this.history[f][id] = newState[id]       
+        this.history[f][id] = newState[id]
       }
     }
   }
-    
-  this.frame--
+  
   if (Object.keys(newState).length) {
     this.set(newState)
     return newState

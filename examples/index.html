@@ -17,7 +17,7 @@ var socket = new io.Socket(config.host)
 
 var game = new Maga.Game({
       frameTime    : 1000 / 45
-    , loopTime     : 1000 / 120
+    , loopTime     : 1000 / 135
     , maxFrameTime : 1000 / 46
     , syncTime     : 1000 / 15
     })
@@ -53,7 +53,6 @@ socket.on('connect', function() {
   }, game.syncTime)
 })
 socket.on('message', function(message) {
-  //console.log(message)
   var state = protocol.parse(message)
   for (var frame in state) {
     for (var id in state[frame]) {
