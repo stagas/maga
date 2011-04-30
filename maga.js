@@ -8,6 +8,10 @@ var util = require('util')
 
 var Maga = {}
 
+/*
+ * Protocol
+ * Usage: new Maga.Protocol(game instance, channel instance)
+ */
 Maga.Protocol = function(game, channel) {
   this.game = game
   this.channel = channel || game.createChannel()
@@ -16,6 +20,7 @@ Maga.Protocol = function(game, channel) {
   return this
 }
 
+// Serialize state of object id
 Maga.Protocol.prototype.stringify = function(id) {
   var obj = {}, state = {}
   state[id] = this.channel.state.current[id]
@@ -30,12 +35,14 @@ Maga.Protocol.prototype.stringify = function(id) {
   return str
 }
  
+// Parse state object
 Maga.Protocol.prototype.parse = function(stringified) {
   var state = JSON.parse(stringified)
   //console.log('RECEIVED STRINGIFIED:', state)
   return state
 }
 
+// Apply given state to game
 Maga.Protocol.prototype.applyState = function(myId, state) {
   for (var frame in state) {
     var newState = this.channel.state.replay.call(this.channel.state, myId, frame, state[frame])
