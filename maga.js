@@ -26,7 +26,7 @@ Maga.Protocol.prototype.stringify = function(id) {
   state[id] = this.channel.state.current[id]
   var diff = this.channel.state.compare.call(this.channel.state, state, this.statePrevious, ['input'])
   this.statePrevious = state
-  obj[this.channel.state.frame] = state || {}
+  obj[this.channel.state.frame || 0] = state || {}
   var str = ''
   if (diff.changes) {
     str = JSON.stringify(obj)
@@ -35,18 +35,18 @@ Maga.Protocol.prototype.stringify = function(id) {
   return str
 }
  
-// Parse state object
+// Apply given state to game 
 Maga.Protocol.prototype.parse = function(stringified) {
   var state = JSON.parse(stringified)
   //console.log('RECEIVED STRINGIFIED:', state)
   return state
 }
 
-// Apply given state to game
 Maga.Protocol.prototype.applyState = function(myId, state) {
   for (var frame in state) {
-    var newState = this.channel.state.replay.call(this.channel.state, myId, frame, state[frame])
-    this.channel.state.set.call(this.channel.state, newState || state[frame])
+    if (!frame) frame = 0
+    this.channel.state.set.call(this.channel.state, state[frame])
+    this.channel.state.replay.call(this.channel.state, myId, frame, state[frame])
   }
 }
 
@@ -57,7 +57,7 @@ Maga.Game = function(options) {
   this.name = 'Maga Game'
   this.frameTime    = 1000 / 45
   this.loopTime     = 1000 / 135
-  this.maxFrameTime = 1000 / 45
+  this.maxFrameTime = 1000 / 46
   this.syncTime     = 1000 / 15
   for (var k in options) {
     this[k] = options[k]
@@ -119,7 +119,7 @@ Maga.Channel.prototype.addObject = function(obj) {
 // Remove an object from the channel
 Maga.Channel.prototype.removeObject = function(obj) {
   if ('object' !== typeof obj) obj = this.objects[obj]
-  obj.destroy()
+  obj && obj.destroy()
   delete this.objects[obj.id]
   return this
 }
@@ -240,6 +240,11 @@ Maga.State = function(channel) {
 
   // Init timer
   this.timer = new Maga.Timer(channel.game)
+  
+  var self = this
+  setTimeout(function() {
+    if (!self.frame || isNaN(self.frame)) self.frame = 1
+  }, 5000)
 }
 
 // Update state of all our objects (move 1 frame forward)
@@ -281,14 +286,16 @@ Maga.State.prototype.push = function(state) {
   // Save previous state
   this.previous = this.current
   
-  // Advance frame position
-  this.frame++
-  
-  // Save to history
-  this.history[this.frame] = this.current
+  if (this.frame) {
+    // Advance frame position
+    this.frame++
 
-  // Limit history length
-  delete this.history[this.frame - 30]
+    // Save to history
+    this.history[this.frame] = this.current
+  
+    // Limit history length
+    delete this.history[this.frame - 500]
+  }
 
   // Set our new state
   this.current = state
@@ -357,21 +364,45 @@ Maga.State.prototype.tick = function() {
 // TODO: Need to resolve conflicts
 Maga.State.prototype.replay = function(myId, frame, state) {
   delete state[myId]
-
-  if (frame > this.frame) this.frame = frame
-
-  this.set(state)
-  return
-  
-  // broken
-  for (var f = parseInt(frame, 10); f < this.frame; f++) {
-    for (var id in state) {
-      this.channel.objects[id].update()
-      this.channel.objects[id].render()
-    }
+  frame = parseInt(frame, 10)
+  if (!isNaN(frame) && !this.frame && frame && frame > 0) {
+    console.log('SETTING FRAME:', frame)
+    this.frame = frame
   }
 
-  return this.get()
+  if (!this.frame || isNaN(frame) || frame == 0) return
+
+  this.set(state)
+
+  for (var id in state) {
+    if (this.channel.objects.hasOwnProperty(id)) {
+      this.channel.objects[id].applyState(state[id])  
+    }
+  }
+  
+  var newState = {}
+
+  if (frame > this.frame) this.frame = frame - 1
+  else for (var f = 0; f < (this.frame - frame); f++) {
+    if (!this.history[f]) this.history[f] = {}
+  
+    for (var id in state) {
+      if (this.channel.objects.hasOwnProperty(id)) {
+        history[f] && this.channel.objects[id].applyState(history[f][id], ['input'])
+        this.channel.objects[id].update()
+        newState[id] = this.channel.objects[id].state()
+        this.history[f][id] = newState[id]       
+      }
+    }
+  }
+    
+  this.frame--
+  if (Object.keys(newState).length) {
+    this.set(newState)
+    return newState
+  }
+  
+  return
 }
 
 // Compare two states and return a diff

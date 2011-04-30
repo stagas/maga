@@ -1,5 +1,5 @@
 //
-// simple example server
+// Simple example server
 //
 
 var util = require('util')
