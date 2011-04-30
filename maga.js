@@ -8,6 +8,9 @@ var util = require('util')
 
 var Maga = {}
 
+/*
+ * Protocol
+ */
 Maga.Protocol = function(game, channel) {
   this.game = game
   this.channel = channel || game.createChannel()
@@ -16,6 +19,7 @@ Maga.Protocol = function(game, channel) {
   return this
 }
 
+// Serialize object <id> state
 Maga.Protocol.prototype.stringify = function(id) {
   var obj = {}, state = {}
   state[id] = this.channel.state.current && this.channel.state.current[id]
@@ -30,12 +34,15 @@ Maga.Protocol.prototype.stringify = function(id) {
   return str
 }
  
+ // Parse state object
 Maga.Protocol.prototype.parse = function(stringified) {
   var state = JSON.parse(stringified)
   //console.log('RECEIVED STRINGIFIED:', state)
   return state
 }
 
+// Apply state to game excluding myId
+// TODO: this needs fixing
 Maga.Protocol.prototype.applyState = function(myId, state) {
   for (var frame in state) {
     if (!frame || isNaN(frame)) frame = 0
