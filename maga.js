@@ -229,8 +229,8 @@ Maga.State = function(channel) {
   this.channel = channel
 
   // Current and previous state objects
-	this.current = {}
-	this.previous = {}
+  this.current = {}
+  this.previous = {}
 
   // Frame position
   this.frame = 0
