@@ -1,0 +1,1 @@
+console.dir(require('./confu')(__dirname, 'config.json'))

@@ -1,0 +1,45 @@
+confu is a simplistic config parser for node.js
+
+
+Installation:
+  npm install confu
+
+  
+Usage:
+  var config = require('confu')(__dirname, '../', 'config.json');
+  
+Also see example.js and config.json in the package
+
+  
+Why is this even useful?
+
+Well, if you have a 'paths' hash in your config object, paths are resolved and normalized, relatively to the path of your config file, so you don't have to do it yourself. Also shamelessly adds a paths.root and paths.config path for convenience.
+
+So, in short, put your 'public', 'views' etc. paths in a 'paths' hash.
+
+Also saves you the trouble of requiring 'fs' and 'path' just to read a config file if you don't need them anywhere else.
+
+
+Example config.json:
+
+  { "name": "myapp"
+  , "host": "localhost"
+  , "port": 80
+  , "paths": 
+    { "public": "./public"
+    , "views": "./views"
+    , "absolute": "/path/to/absolute/thing"
+    }
+  }
+
+In your app 'config' will look like:
+
+  { name: 'myapp',
+    host: 'localhost',
+    port: 80,
+    paths:
+     { public: '/cygdrive/h/work/node/repos/confu/public',
+       views: '/cygdrive/h/work/node/repos/confu/views',
+       absolute: '/path/to/absolute/thing',
+       root: '/cygdrive/h/work/node/repos/confu',
+       config: '/cygdrive/h/work/node/repos/confu/config.json' } }

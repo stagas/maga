@@ -1,0 +1,9 @@
+{ "name": "myapp"
+, "host": "localhost"
+, "port": 80
+, "paths": 
+  { "public": "./public"
+  , "views": "./views"
+  , "absolute": "/path/to/absolute/thing"
+  }
+}
