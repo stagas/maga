@@ -8,7 +8,7 @@
     "multiplayer",
     "framework"
    ],
-  "version": "0.0.2",
+  "version": "0.0.3",
   "author": "George Stagas <gstagas@gmail.com>",
   "engines": {
     "node": "*"
