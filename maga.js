@@ -411,7 +411,7 @@ Maga.State.prototype.replay = function(myId, frame, state) {
   
     for (var id in state) {
       if (this.channel.objects.hasOwnProperty(id)) {
-        history[f] && this.channel.objects[id].applyState(history[f][id], ['input'])
+        //this.history[f] && this.channel.objects[id].applyState(this.history[f][id], ['input'])
         this.channel.objects[id].update()
         newState[id] = this.channel.objects[id].state()
         this.history[f][id] = newState[id]
