@@ -36,12 +36,12 @@ Maga.Protocol.prototype.stringify = function(id) {
   var obj = {}, state = {}
   state[id] = this.channel.state.current && this.channel.state.current[id]
   var diff = this.channel.state.compare.call(this.channel.state, state, this.statePrevious, ['input'])
-  this.statePrevious = state
-  obj[this.channel.state.frame || 0] = state || {}
   var str = ''
   if (diff.changes) {
+    obj[this.channel.state.frame || 0] = state || {}
     str = JSON.stringify(obj)
-    //console.log('STRINGIFIED CURRENT:', str)
+    this.statePrevious = state
+  //console.log('STRINGIFIED CURRENT:', str)
   }
   return str
 }
@@ -394,7 +394,7 @@ Maga.State.prototype.replay = function(myId, frame, state) {
     this.frame = frame + 5
   }
 
-  this.set(state)    
+  this.set(state)
   for (var id in state) {
     if (this.channel.objects.hasOwnProperty(id)) {
       this.channel.objects[id].applyState(state[id])  
@@ -434,7 +434,7 @@ Maga.State.prototype.compare = function(a, b, types) {
     , diff = {}
   
   function exists(id, p) {
-    var exists = false  
+    var exists = false
 
     for (var type, i = types.length; i--;) {
       type = types[i]
