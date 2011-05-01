@@ -1,0 +1,103 @@
+<!doctype html>
+<html>
+<head>
+<title>maga</title>
+<script src="/exposed.js"></script>
+<script src="/jquery.js"></script>
+<script src="/jquery.transform.js"></script>
+<script src="/socket.io/socket.io.js"></script>
+<script>
+
+$(function() {
+
+var util = require('util')
+  , Maga = require('maga')
+  , Keys = require('keys')
+  , Cars = require('cars')
+  , config = require('config')
+
+var keys = new Keys()
+var socket = new io.Socket(config.host)
+
+var game = new Maga.Game({
+      frameTime    : 1000 / 45
+    , loopTime     : 1000 / 135
+    , maxFrameTime : 1000 / 46
+    , syncTime     : 1000 / 15
+    })
+  , channel = game.createChannel()
+  , protocol = new Maga.Protocol(game, channel)
+  , myId
+  , me
+  , players = {}
+
+socket.on('connect', function() {
+  myId = parseInt(socket.transport.sessionid, 10).toString(32)
+  me = new Cars.Player(myId).create()
+
+  players[myId] = me
+  channel.addObject(me)
+
+  /*
+  $('body').click(function() {
+    game.set('frameTime', Math.max(game.get('frameTime') + (Math.random() * 300 - 260), 1000 / 30))
+  })
+  */
+  
+  channel.loop()
+
+  var str
+  setInterval(function() {
+    me.processKeys(keys)
+    str = protocol.stringify(myId)
+    if (str && str.length) socket.send(str)
+  }, game.syncTime)
+})
+socket.on('message', function(message) {
+  var state = protocol.parse(message)
+  for (var frame in state) {
+    for (var id in state[frame]) {
+      if (id == myId) {
+        delete state[frame][id]
+        continue
+      } else if (id == 'disconnectId') {
+        console.log('DISCONNECTED', state[frame].disconnectId)
+        channel.removeObject(state[frame].disconnectId)
+      } else if (!players.hasOwnProperty(id)) {
+        console.log('CREATING PLAYER ' + id)
+        players[id] = new Cars.Player(id).create()
+        channel.addObject(players[id])
+      }
+    }
+  }
+  protocol.applyState(myId, state)
+})
+socket.on('disconnect', function() {})
+
+socket.connect()
+
+})
+</script>
+
+<style>
+html, body {
+width:100%;
+height:100%;
+overflow:hidden;
+background:#070707;
+}
+.car {
+position:absolute;
+width:50px;
+height:20px;
+margin-left:-10px;
+margin-top:-30px;
+border-radius:2px;
+}
+</style>
+
+</head>
+<body>
+<a href="http://github.com/stagas/maga" target="_blank"><img style="position: absolute; top: 0; right: 0; border: 0; z-index:10000;" src="https://d3nwyuy0nl342s.cloudfront.net/img/4c7dc970b89fd04b81c8e221ba88ff99a06c6b61/687474703a2f2f73332e616d617a6f6e6177732e636f6d2f6769746875622f726962626f6e732f666f726b6d655f72696768745f77686974655f6666666666662e706e67" alt="Fork me on GitHub"></a>
+</body>
+</html>
