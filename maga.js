@@ -230,8 +230,8 @@ Maga.State = function(channel) {
   this.channel = channel
 
   // Current and previous state objects
-	this.current = {}
-	this.previous = {}
+  this.current = {}
+  this.previous = {}
 
   // Frame position
   this.frame = 0
@@ -295,7 +295,9 @@ Maga.State.prototype.push = function(state) {
     this.history[this.frame] = this.current
   
     // Limit history length
-    delete this.history[this.frame - 500]
+    try {
+      delete this.history[this.frame - 500]
+    } catch(e) {}
   }
 
   // Set our new state
@@ -369,6 +371,7 @@ Maga.State.prototype.replay = function(myId, frame, state) {
   if (!isNaN(frame) && !this.frame && frame && frame > 0) {
     console.log('SETTING FRAME:', frame)
     this.frame = frame
+    return state
   }
 
   if (!this.frame || isNaN(frame) || frame == 0) return
@@ -388,7 +391,7 @@ Maga.State.prototype.replay = function(myId, frame, state) {
   
   var newState = {}
 
-  for (var f = frame; f < this.frame; f++) {
+  for (var f = frame; f < this.frame - 1; f++) {
     if (!this.history[f]) this.history[f] = {}
   
     for (var id in state) {
