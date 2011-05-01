@@ -19,7 +19,7 @@ var socket = new io.Socket(config.host)
 var game = new Maga.Game({
       frameTime    : 1000 / 45
     , loopTime     : 1000 / 135
-    , maxFrameTime : 1000 / 46
+    , maxFrameTime : 1000 / 45
     , syncTime     : 1000 / 15
     })
   , channel = game.createChannel()
@@ -27,6 +27,7 @@ var game = new Maga.Game({
   , myId
   , me
   , players = {}
+  , $console = $('#console')
 
 socket.on('connect', function() {
   myId = parseInt(socket.transport.sessionid, 10).toString(32)
@@ -45,7 +46,9 @@ socket.on('connect', function() {
   })
   */
   
-  channel.loop()
+  channel.loop(function() {
+    //$console.text(this.state.frame)
+  })
 
   var str
   setInterval(function() {
@@ -57,13 +60,14 @@ socket.on('message', function(message) {
   //console.log(message)
   var state = protocol.parse(message)
   for (var frame in state) {
+    $console.text((frame > 0 && channel.state.frame - frame) + ' ' + channel.state.frame)
     for (var id in state[frame]) {
       if (id == myId) {
         delete state[frame][id]
         continue
       } else if (id == 'disconnectId') {
         console.log('DISCONNECTED', state[frame].disconnectId)
-        channel.removeObject(state[frame].disconnectId)
+        return channel.removeObject(state[frame].disconnectId)
       } else if (!players.hasOwnProperty(id)) {
         console.log('CREATING PLAYER ' + id)
         players[id] = new Circles.Player(id).create()
@@ -90,16 +94,26 @@ background:#070707;
 .circle {
 position:absolute;
 /* width:20px;
-height:20px; */
+height:20px; 
 margin-left:-10px;
-margin-top:-10px;
-/* border-radius:10px; */
+margin-top:-10px; */
 border-radius:1000px;
+}
+#console {
+position:fixed;
+top:0;
+left:0;
+z-index:10000;
+color:#BBB;
+font-family:Consolas;
+width:300px;
+height:200px;
 }
 </style>
 
 </head>
 <body>
+<div id="console"></div>
 <a href="http://github.com/stagas/maga" target="_blank"><img style="position: absolute; top: 0; right: 0; border: 0; z-index:10000;" src="https://d3nwyuy0nl342s.cloudfront.net/img/4c7dc970b89fd04b81c8e221ba88ff99a06c6b61/687474703a2f2f73332e616d617a6f6e6177732e636f6d2f6769746875622f726962626f6e732f666f726b6d655f72696768745f77686974655f6666666666662e706e67" alt="Fork me on GitHub"></a>
 </body>
 </html>

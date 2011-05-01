@@ -1,6 +1,4 @@
-//
-// Simple example server
-//
+// simple example server
 
 var util = require('util')
   , express = require('express')
@@ -57,6 +55,7 @@ var flush = function() {
 }
 
 var socket = io.listen(app)
+
 socket.on('connection', function(client) {
   var playerId = parseInt(client.sessionId, 10).toString(32)
   log('***** Joined:', playerId)
@@ -79,3 +78,4 @@ socket.on('connection', function(client) {
 app.listen(config.port, config.host, function() {
   log('HTTP Server listening')
 })
+

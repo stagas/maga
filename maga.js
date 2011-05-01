@@ -16,11 +16,23 @@ Maga.Protocol = function(game, channel) {
   this.channel = channel || game.createChannel()
   game.protocol = this
   this.statePrevious = {}
+  this.frames = [ 0 ]
+  
+  var self = this
+  setInterval(function() {
+    var arr = self.frames.length > 100 && self.frames || [ 0 ]
+    var setFrame = Math.floor(self.frames.reduce(function(n, t) { return parseInt(n, 10) + t }) / self.frames.length)
+    if (!isNaN(setFrame) && setFrame > 0) {
+      self.channel.state.frame = setFrame + Math.floor(Math.abs(self.channel.state.frame - setFrame) / 2)
+      console.log('REDUCED:', self.channel.state.frame)
+    }
+  }, 1000)
   return this
 }
 
 // Serialize object <id> state
 Maga.Protocol.prototype.stringify = function(id) {
+  if (!this.channel.state.frame) return ''
   var obj = {}, state = {}
   state[id] = this.channel.state.current && this.channel.state.current[id]
   var diff = this.channel.state.compare.call(this.channel.state, state, this.statePrevious, ['input'])
@@ -44,6 +56,12 @@ Maga.Protocol.prototype.parse = function(stringified) {
 // Apply state to game excluding myId
 // TODO: this needs fixing
 Maga.Protocol.prototype.applyState = function(myId, state) {
+  this.frames.concat(Object.keys(state))
+  if (this.frames.length > 500) {
+    while (this.frames.length > 500) {
+      this.frames.shift()
+    }
+  }
   for (var frame in state) {
     if (!frame || isNaN(frame)) frame = 0
     var newState = this.channel.state.replay.call(this.channel.state, myId, frame, state[frame])
@@ -126,11 +144,12 @@ Maga.Channel.prototype.removeObject = function(obj) {
 }
 
 // Main channel game loop
-Maga.Channel.prototype.loop = function() {
+Maga.Channel.prototype.loop = function(fn) {
   var self = this
   self.state.tick()
+  fn && fn.call(self)
   setTimeout(function() {
-    self.loop()
+    self.loop(fn)
   }, self.game.loopTime)
 }
 
@@ -366,31 +385,27 @@ Maga.State.prototype.tick = function() {
 // NOTE: Not quite yet - now just advances only the received object
 // TODO: Need to resolve conflicts
 Maga.State.prototype.replay = function(myId, frame, state) {
+  if (!frame || frame == 0) return this.get()
+
   delete state[myId]
   frame = parseInt(frame, 10)
-  if (!isNaN(frame) && !this.frame && frame && frame > 0) {
-    console.log('SETTING FRAME:', frame)
-    this.frame = frame
-    return state
-  }
-
-  if (!this.frame || isNaN(frame) || frame == 0) return
-
-  this.set(state)
   
-  if (frame > this.frame) { 
-    this.frame = frame
-    return state
+  if (frame + 5 > this.frame) {
+    this.frame = frame + 5
   }
-    
+
+  this.set(state)    
   for (var id in state) {
     if (this.channel.objects.hasOwnProperty(id)) {
       this.channel.objects[id].applyState(state[id])  
     }
   }
+
+  if (Math.abs(this.frame - frame) > 50) return
+
   
   var newState = {}
-
+  
   for (var f = frame; f < this.frame - 1; f++) {
     if (!this.history[f]) this.history[f] = {}
   
@@ -409,7 +424,7 @@ Maga.State.prototype.replay = function(myId, frame, state) {
     return newState
   }
   
-  return
+  return state
 }
 
 // Compare two states and return a diff
