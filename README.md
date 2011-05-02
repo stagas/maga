@@ -11,15 +11,13 @@ To run the example
 
 * If you installed with npm:
 
-$ `npm explore maga`
-
-$ `node maga/examples/simple.js` [port=*8080*] [host=*localhost*]
+    npm explore maga
+    node maga/examples/simple.js [port=8080] [host=localhost]
 
 * If cloned:
 
-$ `cd maga`
-
-$ `node maga/examples/simple.js` [port=*8080*] [host=*localhost*]
+    cd maga
+    node maga/examples/simple.js [port=8080] [host=localhost]
 
 
 What it does
