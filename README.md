@@ -6,12 +6,21 @@ Installing
 ----------
     npm install maga
 
+To run the example
+------------------
+
+* If you installed with npm:
+$ `npm explore maga`
+$ `node maga/examples/simple.js` [port=*8080*] [host=*localhost*]
+
+* If cloned:
+$ `cd maga`
+$ `node maga/examples/simple.js` [port=*8080*] [host=*localhost*]
+
+
 What it does
 ------------
-maga attempts to invent the wheel for an authority scheme,
-client predicting network engine that syncs all clients physics
-state automagically using a simple pluggable state serialization 
-protocol.
+maga is a physics client predicting network engine and protocol.
 
 How to get started
 ------------------
