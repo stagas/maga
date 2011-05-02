@@ -9,12 +9,12 @@ Installing
 To run the example
 ------------------
 
-* If you installed with npm:
+If you installed with npm:
 
     npm explore maga
     node maga/examples/simple.js [port=8080] [host=localhost]
 
-* If cloned:
+If cloned:
 
     cd maga
     node maga/examples/simple.js [port=8080] [host=localhost]
