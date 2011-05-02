@@ -63,10 +63,12 @@ function randOrd(){
 return (Math.round(Math.random())-0.5); }
 
 Circle.prototype.update = function() {
-  this.vx += (this.tx - this.ox) / 80
-  this.vy += (this.ty - this.oy) / 80
+  this.vx += ((this.tx - this.ox) / 135)
+  this.vy += ((this.ty - this.oy) / 135)
   this.x += this.vx
   this.y += this.vy
+  this.x = Math.floor(this.x)
+  this.y = Math.floor(this.y)
   this.vx *= this.f
   this.vy *= this.f
 
