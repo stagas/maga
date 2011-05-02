@@ -109,7 +109,7 @@ How to require() in the browser?
 --------------------------------
 Use this:
     
-    [express-expose](https://github.com/visionmedia/express-expose)
+[express-expose](https://github.com/visionmedia/express-expose)
 
 and then you can do this:
 
