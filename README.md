@@ -111,7 +111,7 @@ Use this:
     
 [express-expose](https://github.com/visionmedia/express-expose)
 
-and then you can do this:
+and then you can do this in your express server:
 
     app.exposeRequire()
     app.expose(config, 'config')
@@ -124,7 +124,7 @@ and then you can do this:
       res.send(app.exposed())
     })    
 
-in your app:
+in index.html:
 
     <script src="/exposed.js"></script>
     <script>
