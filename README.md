@@ -1,6 +1,6 @@
 mAKE a gaME (maga)
 ==================
-maga is a lightweight framework for networked physics games
+maga is a lightweight framework for developing multiplayer physics-based games
 
 Installing
 ----------
@@ -22,7 +22,14 @@ If cloned:
 
 What it does
 ------------
-maga is a physics client predicting network engine and protocol.
+Provides a framework for game development, for syncing state 
+across the network using a built-in timestep based
+authority scheme with client prediction.
+
+This means, all
+clients run their own simulation of the entire game while
+compensating for the roundtrip lag by advancing frame steps.
+Every client runs to catch the fastest one.
 
 How to get started
 ------------------
@@ -33,7 +40,7 @@ You start by creating a new game object like this:
     var game = new Maga.Game({
           frameTime    : 1000 / 45
         , loopTime     : 1000 / 135
-        , maxFrameTime : 1000 / 46
+        , maxFrameTime : 1000 / 45
         , syncTime     : 1000 / 15
         })
     
