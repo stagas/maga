@@ -104,3 +104,36 @@ This automatically accounts for changes, so if the inputs don't change, it retur
 `protocol.parse(state_message)` parses a serialized state and returns a state object.
 
 `protocol.applyState(state)` to apply a state object to the game. Automatically handles client rewind/prediction.
+
+How to require() in the browser?
+--------------------------------
+Use this:
+    
+    [express-expose](https://github.com/visionmedia/express-expose)
+
+and then you can do this:
+
+    app.exposeRequire()
+    app.expose(config, 'config')
+    app.expose({ inherits: util.inherits }, 'util')
+    app.exposeModule(__dirname + '/../maga', 'maga')
+    app.exposeModule(__dirname + '/circles', 'circles')
+
+    app.get('/exposed.js', function(req, res) {
+      res.setHeader('Content-Type', 'application/javascript')
+      res.send(app.exposed())
+    })    
+
+in your app:
+
+    <script src="/exposed.js"></script>
+    <script>
+    var util = require('util')
+      , Maga = require('maga')
+      , Circles = require('circles')
+      , config = require('config')
+    </script>
+
+Resources / Credits
+-------------------
+[Gaffer on Games](http://gafferongames.com/) Great resource by Glenn Fiedler about physics networking for programmers
