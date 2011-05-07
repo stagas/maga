@@ -1,5 +1,5 @@
 /*
- * Cars game server
+ * Circles game server
  */
 
 require.paths.unshift(__dirname, __dirname + '/../')
@@ -23,7 +23,7 @@ app.use(function(req, res, next) {
   next()
 })
 app.use(function(req, res, next) {
-  if (req.url === '/') req.url = '/cars.html'
+  if (req.url === '/') req.url = '/circles.html'
   next()
 })
 app.use(app.router)
@@ -36,9 +36,8 @@ app.expose({ inherits: util.inherits }, 'util')
 app.exposeModule('lib/events', 'events')
 app.exposeModule('maga', 'maga')
 app.exposeModule('middleware/playerManager', 'middleware/playerManager')
-app.exposeModule('lib/keys', 'lib/keys')
 app.exposeModule('lib/helpers', 'lib/helpers')
-app.exposeModule('cars', 'cars')
+app.exposeModule('circles', 'circles')
 app.get('/exposed.js', function(req, res) {
   res.send(app.exposed())
 })
@@ -51,12 +50,12 @@ app.listen(config.port, config.host, function() {
 // maga
 var Maga = require('maga')
   , playerManager = require('middleware/playerManager')
-  , Cars = require('cars')
+  , Circles = require('circles')
 
 // new game
-var game = new Maga.Game('Cars')
+var game = new Maga.Game('Circles')
   , room = game.createRoom()
-  , players = playerManager(room, Cars)
+  , players = playerManager(room, Circles)
 
 // main loop
 room.loop()

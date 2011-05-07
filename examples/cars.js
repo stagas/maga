@@ -2,24 +2,8 @@
 // Cars game
 //
 
-Math.PIHC = Math.PI / 180
-
-Math.cosa = function(a) {
-  return Math.round(Math.cos(a * Math.PIHC) * 10000) / 10000
-}
-
-Math.sina = function(a) {
-  return Math.round(Math.sin(a * Math.PIHC) * 10000) / 10000
-}
-
-Math.sgn = function(a) {
-  if (a<0) return -1
-  else if (a>0) return 1
-  else return 0
-}
-
 var util = require('util')
-  , Keys = require('keys')
+  , help = require('lib/helpers')
   , Maga = require('maga')
 
 var Car = function() {
@@ -65,12 +49,12 @@ Car.prototype.update = function() {
   if (this.torque) {
     this.v = Math.min(Math.max(1, this.v * ((5 / (1 + this.v)) * this.acc), this.maxVelocity))
     // calculate new xy velocities
-    this.vx += (this.v * Math.cosa(this.a)) / 50
-    this.vy += (this.v * Math.sina(this.a)) / 50
+    this.vx += (this.v * help.cosa(this.a)) / 50
+    this.vy += (this.v * help.sina(this.a)) / 50
   } else {
     // calculate new xy velocities
-    this.vx += (this.v * Math.cosa(this.a)) / 200
-    this.vy += (this.v * Math.sina(this.a)) / 200
+    this.vx += (this.v * help.cosa(this.a)) / 200
+    this.vy += (this.v * help.sina(this.a)) / 200
   }
   this.x += this.vx
   this.y += this.vy

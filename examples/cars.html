@@ -10,69 +10,48 @@
 
 $(function() {
 
-var util = require('util')
-  , Maga = require('maga')
-  , Keys = require('keys')
+var config = require('config')
+  , socket = new io.Socket(config.host)
+
+// maga
+var Maga = require('maga')
+  , playerManager = require('middleware/playerManager')
+  , keys = new(require('lib/keys'))
   , Cars = require('cars')
-  , config = require('config')
 
-var keys = new Keys()
-var socket = new io.Socket(config.host)
-
-var game = new Maga.Game({
-      frameTime    : 1000 / 45
-    , loopTime     : 1000 / 135
-    , maxFrameTime : 1000 / 46
-    , syncTime     : 1000 / 15
-    })
-  , channel = game.createChannel()
-  , protocol = new Maga.Protocol(game, channel)
-  , myId
+// new game
+var game = new Maga.Game('Cars')
+  , room = game.createRoom()
+  , players = playerManager(room, Cars)
   , me
-  , players = {}
 
+// socket.io
 socket.on('connect', function() {
-  myId = parseInt(socket.transport.sessionid, 10).toString(32)
-  me = new Cars.Player(myId).create()
-
-  players[myId] = me
-  channel.addObject(me)
-
-  /*
-  $('body').click(function() {
-    game.set('frameTime', Math.max(game.get('frameTime') + (Math.random() * 300 - 260), 1000 / 30))
+  // add our own player to the game
+  var me = players.createMyself(parseInt(socket.transport.sessionid, 10).toString(32))
+  room.addObject(me)
+  room.watch(me, function(str) {
+    socket.send(str)
   })
-  */
-  
-  channel.loop()
 
-  var str
-  setInterval(function() {
+  // main loop
+  room.loop(function() {
+    // keyboard input
     me.processKeys(keys)
-    str = protocol.stringify(myId)
-    if (str && str.length) socket.send(str)
-  }, game.syncTime)
+    $('#console').text(this.state.frame)
+  })
 })
+
 socket.on('message', function(message) {
-  var state = protocol.parse(message)
-  for (var frame in state) {
-    for (var id in state[frame]) {
-      if (id == myId) {
-        delete state[frame][id]
-        continue
-      } else if (id == 'disconnectId') {
-        console.log('DISCONNECTED', state[frame].disconnectId)
-        channel.removeObject(state[frame].disconnectId)
-      } else if (!players.hasOwnProperty(id)) {
-        console.log('CREATING PLAYER ' + id)
-        players[id] = new Cars.Player(id).create()
-        channel.addObject(players[id])
-      }
-    }
-  }
-  protocol.applyState(myId, state)
+  room.parse(message, function(state) {
+    players.set(state)
+    room.applyState(state)
+  })
 })
-socket.on('disconnect', function() {})
+
+socket.on('disconnect', function() {
+  players.remove(me)
+})
 
 socket.connect()
 
@@ -94,10 +73,21 @@ margin-left:-10px;
 margin-top:-30px;
 border-radius:2px;
 }
+#console {
+position:fixed;
+top:0;
+left:0;
+z-index:10000;
+color:#BBB;
+font-family:Courier;
+width:300px;
+height:200px;
+}
 </style>
 
 </head>
 <body>
+<div id="console"></div>
 <a href="http://github.com/stagas/maga" target="_blank"><img style="position: absolute; top: 0; right: 0; border: 0; z-index:10000;" src="https://d3nwyuy0nl342s.cloudfront.net/img/4c7dc970b89fd04b81c8e221ba88ff99a06c6b61/687474703a2f2f73332e616d617a6f6e6177732e636f6d2f6769746875622f726962626f6e732f666f726b6d655f72696768745f77686974655f6666666666662e706e67" alt="Fork me on GitHub"></a>
 </body>
 </html>

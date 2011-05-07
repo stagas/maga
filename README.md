@@ -6,53 +6,64 @@ Installing
 ----------
     npm install maga
 
-To run the example
+To run the examples
 ------------------
 
-If you installed with npm:
+`npm explore maga` or `cd maga` if you cloned:
 
-    npm explore maga
-    node examples/simple.js [8080] [localhost]
+    node examples/circles-server.js [8080] [localhost]
+    node examples/cars-server.js [8080] [localhost]
+    node examples/hax-server.js [8080] [localhost]
 
-If cloned:
-
-    cd maga
-    node examples/simple.js [8080] [localhost]
-
-
-What it does
+Introduction
 ------------
-Provides a framework for game development, for syncing state 
-across the network using a built-in timestep based
-authority scheme with client prediction.
+maga is a framework to assist in game development, syncing physics state 
+across the network among multiple clients using a built-in timestep based
+authority scheme with client prediction. It runs in any CommonJS enviroment,
+so you can use it in both node.js and the browser. You get to use
+the same code in your server backend simulation and the browser's simulation.
 
-This means, all
-clients run their own simulation of the entire game while
-compensating for the roundtrip lag by advancing frame steps.
+Every instance is both a sender and a receiver, it runs its own simulation
+of the entire game while compensating for the roundtrip lag by advancing frame steps.
 Every client runs to catch the fastest one.
+
+See the hax example for both server/client usage.
 
 How to get started
 ------------------
 You start by creating a new game object like this:
     
     var Maga = require('maga')
+    var game = new Maga.Game()
     
-    var game = new Maga.Game({
-          frameTime    : 1000 / 45
-        , loopTime     : 1000 / 135
-        , maxFrameTime : 1000 / 45
-        , syncTime     : 1000 / 15
-        })
-    
-In this game we can create channels like this:
+In this game we can create rooms like this:
 
-    var channel = game.createChannel()
+    var room = game.createRoom()
 
-And we'll also need a protocol instance:
+The Room
+--------
 
-    var protocol = new Maga.Protocol(game, channel)
+`room.watch(object || objectId, function(serialized) { ... })` watches an object for changes and returns a
+serialized string you can then send over the network.
 
-You define your objects yourself and inherit from `Maga.Object`.
+`room.parse(serialized, function(state) { ... })` parses a serialized state and returns a state object.
+
+`room.applyState(state)` to apply an incoming state object to the room. Automatically handles client prediction.
+
+`room.on('state', function(state) { ... })` fires whenever a message is parsed with `room.parse()`
+
+`room.loop(fn)` The room's main loop. Calls fn on each iteration. `this` is the room object.
+
+`room.addObject(object)` Add an object to the game.
+
+`room.removeObject(object || objectId)` Remove an object from the game.
+
+`room.stringify(object || objectId)` returns a stringified representation of the object with id.
+This automatically accounts for changes, so if the inputs don't change, it returns nothing.
+
+Objects
+-------
+You create your objects yourself and inherit from `Maga.Object`.
 Here is from the example Circles game source:
 
     var Circle = function() {
@@ -88,22 +99,46 @@ Here is from the example Circles game source:
 
     util.inherits(Circle, Maga.Object)
 
-Your objects require to have these methods: `.update` `.render` `.destroy`
-The `update` method is called to advances the physics state by 1 frame
+Your objects require to have these methods: `update` `create` `render` and `destroy`
+
+The `update` method advances the physics state by 1 frame.
+
 The `render` method is called with an object argument containing
-the render registered properties. You can use them to draw wherever
+the render properties. You can use them to draw wherever
 you like, a canvas, the DOM, it's up to you.
+
+The `create` method is used to create the DOM/canvas object.
+
 The `destroy` method to remove the object.
 
-Protocol
---------
+How to handle players
+---------------------
+Luckily, maga comes with a `playerManager` middleware included. You can use it to do simple player
+management for a jump start. Here's an example:
 
-`protocol.stringify(myId)` returns a stringified representation of the object with myId.
-This automatically accounts for changes, so if the inputs don't change, it returns nothing.
+    // maga
+    var Maga = require('maga')
+      , playerManager = require('middleware/playerManager')
+      , Circles = require('circles')
 
-`protocol.parse(state_message)` parses a serialized state and returns a state object.
+    // new game
+    var game = new Maga.Game('Circles')
+      , room = game.createRoom()
+      , players = playerManager(room, Circles)
 
-`protocol.applyState(state)` to apply a state object to the game. Automatically handles client rewind/prediction.
+The `players` object then has these methods:
+
+`players.set(state)` This parses an incoming state, should be used in the `room.parse()` callback just before `room.applyState()`
+
+`state = players.get()` Gets current state
+
+`player = players.create(id)` Create a new player using our object constructor
+
+`players.remove(object || id)` Remove a player
+
+`me = players.createMyself(id)` Create our character
+
+`players.forEach(function(player, id) { ... })` Iterate players in the room
 
 How to require() in the browser?
 --------------------------------
@@ -118,7 +153,6 @@ and then you can do this in your express server:
     app.expose({ inherits: util.inherits }, 'util')
     app.exposeModule(__dirname + '/../maga', 'maga')
     app.exposeModule(__dirname + '/circles', 'circles')
-
     app.get('/exposed.js', function(req, res) {
       res.setHeader('Content-Type', 'application/javascript')
       res.send(app.exposed())

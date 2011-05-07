@@ -2,87 +2,42 @@
  * mAKE a gaME (maga)
  *
  * by stagas (gstagas@gmail.com)
+ *
+ * MIT licenced
  */
 
 var util = require('util')
+  , EventEmitter = require('events').EventEmitter
 
 var Maga = {}
 
-/*
- * Protocol
- */
-Maga.Protocol = function(game, channel) {
-  this.game = game
-  this.channel = channel || game.createChannel()
-  game.protocol = this
-  this.statePrevious = {}
-  this.frames = [ 0 ]
-  
-  var self = this
-  setInterval(function() {
-    var arr = self.frames.length > 100 && self.frames || [ 0 ]
-    var setFrame = Math.floor(self.frames.reduce(function(n, t) { return parseInt(n, 10) + t }) / self.frames.length)
-    if (!isNaN(setFrame) && setFrame > 0) {
-      self.channel.state.frame = setFrame + Math.floor(Math.abs(self.channel.state.frame - setFrame) / 2)
-      console.log('REDUCED:', self.channel.state.frame)
-    }
-  }, 1000)
-  return this
-}
-
-// Serialize object <id> state
-Maga.Protocol.prototype.stringify = function(id) {
-  if (!this.channel.state.frame) return ''
-  var obj = {}, state = {}
-  state[id] = this.channel.state.current && this.channel.state.current[id]
-  var diff = this.channel.state.compare.call(this.channel.state, state, this.statePrevious, ['input'])
-  var str = ''
-  if (diff.changes) {
-    obj[this.channel.state.frame || 0] = state || {}
-    str = JSON.stringify(obj)
-    this.statePrevious = state
-  //console.log('STRINGIFIED CURRENT:', str)
-  }
-  return str
-}
- 
- // Parse state object
-Maga.Protocol.prototype.parse = function(stringified) {
-  var state = JSON.parse(stringified)
-  //console.log('RECEIVED STRINGIFIED:', state)
-  return state
-}
-
-// Apply state to game excluding myId
-// TODO: this needs fixing
-Maga.Protocol.prototype.applyState = function(myId, state) {
-  this.frames.concat(Object.keys(state))
-  if (this.frames.length > 500) {
-    while (this.frames.length > 500) {
-      this.frames.shift()
-    }
-  }
-  for (var frame in state) {
-    if (!frame || isNaN(frame)) frame = 0
-    var newState = this.channel.state.replay.call(this.channel.state, myId, frame, state[frame])
-    this.channel.state.set(newState)
-  }
-}
+var debug
 
 /*
  * Game
  */
-Maga.Game = function(options) {
-  this.name = 'Maga Game'
+Maga.Game = function(name, options) {
+  if ('object' === typeof name)
+    options = name, name = 'Maga Game'
+
+  this.name         = name
   this.frameTime    = 1000 / 45
   this.loopTime     = 1000 / 135
   this.maxFrameTime = 1000 / 45
-  this.syncTime     = 1000 / 5
+  this.syncTime     = 1000 / 15
+  this.lag          = 110
+  this.draw         = ('undefined' !== typeof window)
+  this.debug        = 0
   for (var k in options) {
     this[k] = options[k]
   }
-  this.channels = {}
-  this.protocol = null
+ 
+  this.rooms = {}
+
+  if (this.debug) debug = function(level) {
+    if (level <= this.debug)
+      console.log.apply(console, [].slice.call(arguments, 1))
+  }  
 }
 
 // Get an option value
@@ -95,56 +50,137 @@ Maga.Game.prototype.set = function(key, val) {
   return this[key] = val
 }
 
-// Create a channel of ID
-Maga.Game.prototype.createChannel = function(id) {
+// Create a room of ID
+Maga.Game.prototype.createRoom = function(id) {
   if (!id) id = Math.random() * 100000 | 0
-  this.channels[id] = new Maga.Channel(id, this)
-  return this.channels[id]
+  this.rooms[id] = new Maga.Room(id, this)
+  return this.rooms[id]
 }
 
-// Destroy a channel by ID or object
-Maga.Game.prototype.destroyChannel = function(channel) {
-  if ('object' !== typeof channel) channel = this.channels[channel]
-  channel.destroy()
+// Destroy a room by ID or object
+Maga.Game.prototype.destroyRoom = function(room) {
+  if ('object' !== typeof room) room = this.rooms[room]
+  room.destroy()
   return this
 }
 
 /*
- * Channel
+ * Protocol
  */
-Maga.Channel = function(id, game) {
+Maga.Protocol = function(room) {
+  this.room = room
+  this.state = room.state
+  this.statePrevious = {}
+  return this
+}
+
+// Serialize object <id> state
+Maga.Protocol.prototype.stringify = function(id, force) {
+  if ('object' === typeof id) id = id.id
+  var obj = {}, state = {}
+  state[id] = this.room.objects && id && this.room.objects[id] && this.room.objects[id].state()
+  var diff = this.state.compare.call(this.state, state, this.statePrevious, ['input'])
+  var str = ''
+  if (diff.changes || force) {
+    //if (!force)
+      //diff = this.state.compare.call(this.state, state, this.statePrevious)
+
+    obj[this.state.frame || 0] = state || {}
+    str = JSON.stringify(obj)
+    this.statePrevious = state
+    //console.log('STRINGIFIED CURRENT:', str)
+  }
+  return str
+}
+
+// Parse state object
+Maga.Protocol.prototype.parse = function(stringified, cb) {
+  var state = JSON.parse(stringified)
+  this.room.emit('state', state)
+  //console.log('RECEIVED STRINGIFIED:', state)
+  cb && cb(state)
+  return state
+}
+
+/*
+ * Room
+ */
+Maga.Room = function(id, game) {
+  var self = this
   this.id = id
   this.game = game
   this.objects = {}
   this.state = new Maga.State(this)
+  this.protocol = new Maga.Protocol(this)
+  this.watching = {}
+  setInterval(function() {
+    var str, cb
+    for (var id in self.watching) {
+      cb = self.watching[id]
+      str = self.stringify(id)
+      if (str && str.length) {
+        self.emit('sync', id, str)
+        cb && cb(str)
+      }
+    }
+  }, this.game.syncTime)
+  EventEmitter.call(this)
 }
 
-// Destroy channel and remove from game
-Maga.Channel.prototype.destroy = function() {
+util.inherits(Maga.Room, EventEmitter)
+
+Maga.Room.prototype.stringify = function() {
+  return this.protocol.stringify.apply(this.protocol, arguments)
+}
+
+Maga.Room.prototype.parse = function() {
+  return this.protocol.parse.apply(this.protocol, arguments)
+}
+
+// Destroy room and remove from game
+Maga.Room.prototype.destroy = function() {
   for (var id in this.objects) {
     delete this.objects[id]
   }
-  delete this.game.channels[this.id]
+  delete this.game.rooms[this.id]
   return this
 }
 
-// Add an object to the channel
-Maga.Channel.prototype.addObject = function(obj) {
-  obj.channel = this
+// Add an object to the room
+Maga.Room.prototype.addObject = function(obj) {
+  obj.room = this
   this.objects[obj.id] = obj
   return this
 }
 
-// Remove an object from the channel
-Maga.Channel.prototype.removeObject = function(obj) {
-  if ('object' !== typeof obj) obj = this.objects[obj]
-  obj && obj.destroy()
-  delete this.objects[obj.id]
+// Remove an object from the room
+Maga.Room.prototype.removeObject = function(id) {
+  if ('object' === typeof id) id = id.id
+  this.game.draw && this.objects[id] && this.objects[id].destroy()
+  delete this.objects[id]
   return this
 }
 
-// Main channel game loop
-Maga.Channel.prototype.loop = function(fn) {
+Maga.Room.prototype.applyState = function(state) {
+  for (var frame in state) {
+    if (!frame || isNaN(frame)) continue
+    var newState = this.state.replay(frame, state[frame])
+    this.state.set(newState)
+  }
+}
+
+Maga.Room.prototype.watch = function(id, cb) {
+  if ('object' === typeof id) id = id.id
+  this.watching[id] = cb
+}
+
+Maga.Room.prototype.unwatch = function(id) {
+  if ('object' === typeof id) id = id.id
+  delete this.watching[id]
+}
+
+// Main room game loop
+Maga.Room.prototype.loop = function(fn) {
   var self = this
   self.state.tick()
   fn && fn.call(self)
@@ -156,9 +192,9 @@ Maga.Channel.prototype.loop = function(fn) {
 /*
  * Object
  */
-Maga.Object = function(id, channel) {
+Maga.Object = function(id, room) {
   this.id = id
-  this.channel = channel
+  this.room = room
   
   // Our property types
   this.properties = {
@@ -178,7 +214,7 @@ Maga.Object.prototype.register = function(obj) {
     for (var p in obj[type]) {
       this[p] = obj[type][p]
       this.properties[type].push(p)
-      this.properties.all.push(p)
+      if (type !== 'static') this.properties.all.push(p)
     }
   }
   return this
@@ -216,6 +252,8 @@ Maga.Object.prototype.applyState = function(state, types) {
 /*
  * Timer
  */
+
+// NOTE: Maybe all objects should have a timer instance
 Maga.Timer = function(game, target) {
   this.game = game
 	this.now = Date.now()
@@ -245,32 +283,28 @@ Maga.Timer.prototype.alpha = function() {
 /*
  * State
  */
-Maga.State = function(channel) {
-  this.channel = channel
+Maga.State = function(room) {
+  this.room = room
+  this.game = room.game
 
   // Current and previous state objects
   this.current = {}
   this.previous = {}
 
   // Frame position
-  this.frame = 0
+  this.frame = 1
   
   // History object
   this.history = {}
 
   // Init timer
-  this.timer = new Maga.Timer(channel.game)
-  
-  var self = this
-  setTimeout(function() {
-    if (!self.frame || isNaN(self.frame)) self.frame = 1
-  }, 5000)
+  this.timer = new Maga.Timer(room.game)
 }
 
 // Update state of all our objects (move 1 frame forward)
 Maga.State.prototype.update = function() {
-  for (var id in this.channel.objects) {
-    this.channel.objects[id].update()
+  for (var id in this.room.objects) {
+    this.room.objects[id].update()
   }
   return this
 }
@@ -282,23 +316,23 @@ Maga.State.prototype.advance = function(n) {
   }
 }
 
-// Get entire channel current state
+// Get entire room current state
 Maga.State.prototype.get = function() {
   var state = {}
-  for (var id in this.channel.objects) {
-    state[id] = this.channel.objects[id].state()
+  for (var id in this.room.objects) {
+    state[id] = this.room.objects[id].state()
   }
   return state
 }
 
-// Apply an entire channel state
+// Apply an entire room state
 Maga.State.prototype.set = function(state, types) {
   for (var id in state) {
-    if (this.channel.objects.hasOwnProperty(id))
-      this.channel.objects[id].applyState(state[id], types)
+    if (this.room.objects.hasOwnProperty(id))
+      this.room.objects[id].applyState(state[id], types)
   }
   this.current = state
-  return this.channel.state.get()
+  return this.room.state.get()
 }
 
 // Push a state frame
@@ -315,7 +349,7 @@ Maga.State.prototype.push = function(state) {
   
     // Limit history length
     try {
-      delete this.history[this.frame - 500]
+      delete this.history[this.frame - 100]
     } catch(e) {}
   }
 
@@ -346,6 +380,7 @@ Maga.State.prototype.alpha = function(a) {
         ? current[p] 
         : 'undefined' !== typeof previous[p] && previous[p]
           || current[p]
+      if (isNaN(frame[p])) frame[p] = current[p]
     }
 
     alpha[id] = frame
@@ -355,8 +390,10 @@ Maga.State.prototype.alpha = function(a) {
 
 // Render objects with given state
 Maga.State.prototype.render = function(state) {
-  for (var id in state) {
-    if (state[id] && this.channel.objects[id]) this.channel.objects[id].render(state[id])
+  if (this.game.draw) {
+    for (var id in state) {
+      if (state[id] && this.room.objects[id] && this.room.objects[id]) this.room.objects[id].render(state[id])
+    }
   }
 }
 
@@ -382,63 +419,54 @@ Maga.State.prototype.tick = function() {
 }
 
 // Replay a history range according to some state input in the past
-// NOTE: Not quite yet - now just advances only the received object
-// TODO: Need to resolve conflicts
-Maga.State.prototype.replay = function(myId, frame, state) {
-  if (!frame || frame == 0) return this.get()
-
-  delete state[myId]
+Maga.State.prototype.replay = function(frame, state) {
   frame = parseInt(frame, 10)
   
-  if (frame + 5 > this.frame) {
-    this.frame = frame + 5
+  var lag = Math.round(this.game.lag / this.game.frameTime)
+  if (frame + lag > this.frame) {
+    this.frame = frame + lag
+  } else if (frame + lag < this.frame - lag) {
+    this.frame = frame + Math.round(lag * 1.1)
   }
+
+  if (Math.abs(this.frame - frame) > 100) return
+  
+  this.previous = this.get()
 
   this.set(state)
-  for (var id in state) {
-    if (this.channel.objects.hasOwnProperty(id)) {
-      this.channel.objects[id].applyState(state[id])  
-    }
-  }
 
-  if (Math.abs(this.frame - frame) > 50) return
 
-  
   var newState = {}
-  
-  for (var f = frame; f < this.frame - 1; f++) {
-    if (!this.history[f]) this.history[f] = {}
-  
+
+  for (var f = frame; f < this.frame; f++) {
     for (var id in state) {
-      if (this.channel.objects.hasOwnProperty(id)) {
-        //this.history[f] && this.channel.objects[id].applyState(this.history[f][id], ['input'])
-        this.channel.objects[id].update()
-        newState[id] = this.channel.objects[id].state()
-        this.history[f][id] = newState[id]
+      if (id in this.room.objects) {
+        this.room.objects[id].update()
+        newState[id] = this.room.objects[id].state()
       }
     }
   }
   
-  if (Object.keys(newState).length) {
-    this.set(newState)
-    return newState
-  }
+  this.set(newState)
   
-  return state
+  return newState
 }
 
 // Compare two states and return a diff
 Maga.State.prototype.compare = function(a, b, types) {
   var self = this
     , changes = 0
+    , percentage = 0
     , diff = {}
+  
+  types = types || [ 'all' ]
   
   function exists(id, p) {
     var exists = false
 
     for (var type, i = types.length; i--;) {
       type = types[i]
-      if (~self.channel.objects[id].properties[type].indexOf(p)) {
+      if (~self.room.objects[id].properties[type].indexOf(p)) {
         exists = true
         break
       }
@@ -454,16 +482,18 @@ Maga.State.prototype.compare = function(a, b, types) {
         if ('undefined' === typeof b[id][p]) {
           changes++
           diff[id][p] = a[id][p]
+          percentage += 1
         }
         else if (a[id][p] !== b[id][p]) {
           changes++
           diff[id][p] = a[id][p]
+          percentage += Math.abs((diff[id][p] - b[id][p]) / diff[id][p])
         }
       }
     }
   }
 
-  return { diff: diff, changes: changes }
+  return { diff: diff, changes: changes, percentage: percentage / changes }
 }
 
 module.exports = exports = Maga

@@ -23,7 +23,7 @@ app.use(function(req, res, next) {
   next()
 })
 app.use(function(req, res, next) {
-  if (req.url === '/') req.url = '/cars.html'
+  if (req.url === '/') req.url = '/hax.html'
   next()
 })
 app.use(app.router)
@@ -38,7 +38,7 @@ app.exposeModule('maga', 'maga')
 app.exposeModule('middleware/playerManager', 'middleware/playerManager')
 app.exposeModule('lib/keys', 'lib/keys')
 app.exposeModule('lib/helpers', 'lib/helpers')
-app.exposeModule('cars', 'cars')
+app.exposeModule('hax', 'hax')
 app.get('/exposed.js', function(req, res) {
   res.send(app.exposed())
 })
@@ -51,15 +51,33 @@ app.listen(config.port, config.host, function() {
 // maga
 var Maga = require('maga')
   , playerManager = require('middleware/playerManager')
-  , Cars = require('cars')
+  , help = require('lib/helpers')
+  , Hax = require('hax')
 
 // new game
-var game = new Maga.Game('Cars')
+var game = new Maga.Game('Hax', { syncTime: 1000 / 1, lag: 50 }) // todo: determine lag
   , room = game.createRoom()
-  , players = playerManager(room, Cars)
+  , players = playerManager(room, Hax, { ignore: 'ball' })
+
+var ball = new Hax.Ball()
+room.addObject(ball)
+
+// todo: this is common, should be an internal method
+var statePrevious = {}
+setInterval(function() {
+  var obj = {}
+  var diff = room.state.compare(room.state.current, statePrevious)
+  if (diff.changes) {
+    obj[room.state.frame] = diff.diff
+    socket.broadcast(JSON.stringify(obj))
+  }
+  statePrevious = room.state.current || {}
+}, 1000)
 
 // main loop
-room.loop()
+room.loop(function() {
+  //
+})
 
 // socket.io server
 var socket = io.listen(app)
@@ -67,6 +85,9 @@ var socket = io.listen(app)
 socket.on('connection', function(client) {
   var playerId = parseInt(client.sessionId, 10).toString(32)
   log('***** Joined:', playerId)
+
+  // send ball
+  client.send(room.stringify(ball, true))
 
   // send other players state to our newly joined client
   players.forEach(function(player, id) {

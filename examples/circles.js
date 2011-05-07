@@ -1,29 +1,14 @@
-//
-// Simple circles game
-//
-
-Math.PIHC = Math.PI / 180
-
-Math.cosa = function(a) {
-  return Math.round(Math.cos(a * Math.PIHC) * 10000) / 10000
-}
-
-Math.sina = function(a) {
-  return Math.round(Math.sin(a * Math.PIHC) * 10000) / 10000
-}
-
-Math.sgn = function(a) {
-  if (a<0) return -1
-  else if (a>0) return 1
-  else return 0
-}
+/*
+ * Simple circles game
+ */
 
 var util = require('util')
+  , help = require('lib/helpers')
   , Maga = require('maga')
 
 var Circle = function() {
   Maga.Object.apply(this, arguments)
-  
+
   var val = parseInt(this.id, 32), size
   size = parseInt(val.toString().substr(0, 2), 10)
 
@@ -59,9 +44,6 @@ var Circle = function() {
 
 util.inherits(Circle, Maga.Object)
 
-function randOrd(){
-return (Math.round(Math.random())-0.5); }
-
 Circle.prototype.update = function() {
   this.vx += ((this.tx - this.ox) / 135)
   this.vy += ((this.ty - this.oy) / 135)
@@ -75,30 +57,21 @@ Circle.prototype.update = function() {
   var self = this
   var dist, minDist, dx, dy, angle, sx, sy
     , tx, ty
-  Object.keys(this.channel.objects).sort(randOrd).forEach(function(id) {
-    
+  Object.keys(this.room.objects).sort(help.randOrd).forEach(function(id) {
     if (id == self.id) return
     
-    var obj = self.channel.objects[id]
+    var obj = self.room.objects[id]
     if (!obj.x || !obj.y) return
     
-    dx = obj.x - self.x
-    dy = obj.y - self.y
-    dist = Math.sqrt(dx*dx + dy*dy)
-    minDist = self.width / 2 + obj.width / 2
-    if (dist < minDist) {
-      angle = Math.atan2(dy, dx)
-      tx = self.x + (Math.cos(angle) * minDist)
-      ty = self.y + (Math.sin(angle) * minDist)
-      sx = tx - obj.x
-      sy = ty - obj.y
-      
-      self.x -= sx
-      self.y -= sy
-      self.vx -= sx / 3
-      self.vy -= sy / 3 
-      obj.vx += sx / 3
-      obj.vy += sy / 3
+    var c = help.circleToCircle(self, obj)
+
+    if (c.collided) {
+      self.x -= c.sx
+      self.y -= c.sy
+      self.vx -= c.sx / 12
+      self.vy -= c.sy / 12
+      obj.vx += c.sx / 12
+      obj.vy += c.sy / 12
     }
   })
   this.ox = this.x
@@ -140,3 +113,5 @@ var Player = exports.Player = function() {
   Circle.apply(this, arguments)
 }
 util.inherits(Player, Circle)
+
+// helpers
