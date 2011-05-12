@@ -2,6 +2,8 @@ mAKE a gaME (maga)
 ==================
 maga is a lightweight framework for developing multiplayer physics-based games
 
+**WARNING: API unstable - This is an early release of the library. I will be juggling things around as I dig deeper so expect things to change. Suggestions/contributing is welcome**
+
 Installing
 ----------
     npm install maga
